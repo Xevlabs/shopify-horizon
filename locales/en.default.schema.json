@@ -435,7 +435,8 @@
     "view_all_button": "View all",
     "pills": "Pills",
     "comparison_slider": "Comparison slider",
-    "wine_selector": "Wine seller"
+    "wine_selector": "Wine seller",
+    "size_selector": "Size selector"
   },
   "options": {
     "above_carousel": "Above carousel",

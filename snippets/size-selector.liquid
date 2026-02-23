@@ -1,0 +1,103 @@
+{%- doc -%}
+  Renders pill-style links to switch between sibling wine products of different sizes.
+  Each size is a separate Shopify product linked via a shared `wine_siblings` metaobject.
+
+  @param {object} product_resource - the current product
+{%- enddoc -%}
+
+{% liquid
+  assign siblings_metaobject = product_resource.metafields.custom.siblings_size.value
+  assign siblings = siblings_metaobject.products.value
+%}
+
+{% if siblings != blank and siblings.size > 1 %}
+  <div class="size-selector">
+    <span class="size-selector__label">Conditionnement</span>
+    <div class="size-selector__pills">
+      {% for sibling in siblings %}
+        {% liquid
+          assign label = sibling.metafields.custom.bottle_size.value
+          if label == blank
+            assign label = sibling.title
+          endif
+        %}
+        {% if sibling.id == product_resource.id %}
+          <span class="size-selector__pill size-selector__pill--active" aria-current="page">
+            {{- label -}}
+          </span>
+        {% else %}
+          <a href="{{ sibling.url }}" class="size-selector__pill">
+            {{- label -}}
+          </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+{% stylesheet %}
+  .size-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .size-selector__label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgb(var(--color-foreground));
+    opacity: 0.7;
+  }
+
+  .size-selector__pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .size-selector__pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding-block: 6px;
+    padding-inline: 16px;
+    border: 1px solid rgb(var(--color-foreground) / 0.3);
+    border-radius: 999px;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    text-decoration: none;
+    color: rgb(var(--color-foreground));
+    background: transparent;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+  }
+
+  .size-selector__pill:hover {
+    border-color: rgb(var(--color-foreground));
+    background-color: rgb(var(--color-foreground) / 0.05);
+  }
+
+  .size-selector__pill:focus-visible {
+    outline: 2px solid rgb(var(--color-foreground));
+    outline-offset: 2px;
+  }
+
+  .size-selector__pill--active {
+    background-color: rgb(var(--color-foreground));
+    color: rgb(var(--color-background));
+    border-color: rgb(var(--color-foreground));
+    cursor: default;
+  }
+
+  .size-selector__pill--active:hover {
+    background-color: rgb(var(--color-foreground));
+    border-color: rgb(var(--color-foreground));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .size-selector__pill {
+      transition: none;
+    }
+  }
+{% endstylesheet %}
