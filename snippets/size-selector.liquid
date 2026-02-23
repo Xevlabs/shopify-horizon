@@ -16,8 +16,10 @@
     <div class="size-selector__pills">
       {% for sibling in siblings %}
         {% liquid
-          assign label = sibling.metafields.custom.bottle_size.value
-          if label == blank
+          assign label = sibling.metafields.wine.volume_cl.value
+          if label != blank
+            assign label = label | append: ' cl'
+          else
             assign label = sibling.title
           endif
         %}
