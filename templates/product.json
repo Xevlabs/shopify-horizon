@@ -184,17 +184,6 @@
               },
               "blocks": {}
             },
-            "size_selector_C86ba3": {
-              "type": "size-selector",
-              "name": "t:names.size_selector",
-              "settings": {
-                "padding-block-start": 0,
-                "padding-block-end": 0,
-                "padding-inline-start": 0,
-                "padding-inline-end": 0
-              },
-              "blocks": {}
-            },
             "wine_selector_twill": {
               "type": "wine-selector",
               "settings": {
@@ -271,7 +260,6 @@
             "group_icgrde",
             "divider_VJhene",
             "size_selector_twill",
-            "size_selector_C86ba3",
             "wine_selector_twill",
             "buy_buttons_eYQEYi",
             "text_aEtTtq"
