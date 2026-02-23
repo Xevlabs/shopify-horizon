@@ -1,16 +1,19 @@
 import { Component } from '@theme/component';
-import { VariantSelectedEvent, VariantUpdateEvent } from '@theme/events';
-import { morph, MORPH_OPTIONS } from '@theme/morph';
+import { VariantSelectedEvent, VariantUpdateEvent, CartAddEvent } from '@theme/events';
 
 /**
  * @typedef {object} WineSelectorRefs
- * @property {HTMLInputElement[]} cards - The radio input elements for each seller card.
+ * @property {HTMLInputElement} bestOfferInput - The hidden radio for the best offer (auto-selected).
+ * @property {HTMLElement} otherSellers - The details element wrapping other sellers.
+ * @property {HTMLButtonElement[]} addToCartButtons - Add-to-cart buttons on alternative seller cards.
  */
 
 /**
- * A custom element that manages a wine seller variant picker.
- * Each seller corresponds to a product variant. Clicking a seller card
- * selects that variant and dispatches the same events as the standard variant-picker.
+ * Wine seller variant picker component.
+ *
+ * Default state: the best offer variant is selected and the existing buy-buttons
+ * block handles add-to-cart. A <details> toggle reveals other sellers, each with
+ * their own add-to-cart button that posts directly to the Cart API.
  *
  * @extends {Component<WineSelectorRefs>}
  */
@@ -20,24 +23,80 @@ export default class WineSelector extends Component {
 
   connectedCallback() {
     super.connectedCallback();
-    this.addEventListener('change', this.#onSellerChanged);
+
+    // Select the best-offer variant on first load so product-form picks it up
+    const bestInput = this.refs.bestOfferInput;
+    if (bestInput) {
+      this.#selectVariant(bestInput);
+    }
   }
 
   /**
-   * Handles a seller card being selected.
-   * @param {Event} event
+   * Handles clicking "Ajouter au panier" on an alternative seller card.
+   * Posts directly to the Cart API then dispatches CartAddEvent.
+   * @param {MouseEvent} event
    */
-  #onSellerChanged = (event) => {
-    if (!(event.target instanceof HTMLInputElement)) return;
+  addToCart(event) {
+    const button = /** @type {HTMLButtonElement} */ (event.currentTarget);
+    const variantId = button.dataset.variantId;
+    if (!variantId) return;
 
-    const selectedInput = event.target;
-    const optionValueId = selectedInput.dataset.optionValueId ?? '';
+    button.disabled = true;
+    button.textContent = '…';
+
+    const body = JSON.stringify({
+      items: [{ id: Number(variantId), quantity: 1 }],
+    });
+
+    fetch(Theme.routes.cart_add_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body,
+    })
+      .then((response) => response.json())
+      .then((response) => {
+        if (response.status) {
+          button.textContent = 'Erreur';
+          setTimeout(() => {
+            button.disabled = false;
+            button.textContent = 'Ajouter au panier';
+          }, 2000);
+          return;
+        }
+
+        button.textContent = 'Ajouté !';
+        setTimeout(() => {
+          button.disabled = false;
+          button.textContent = 'Ajouter au panier';
+        }, 1500);
+
+        this.dispatchEvent(
+          new CartAddEvent({}, this.id, {
+            source: 'wine-selector',
+            itemCount: 1,
+            productId: this.dataset.productId,
+            variantId,
+          })
+        );
+      })
+      .catch(() => {
+        button.disabled = false;
+        button.textContent = 'Ajouter au panier';
+      });
+  }
+
+  /**
+   * Selects a variant by dispatching events and fetching updated section HTML.
+   * Used for the best-offer on initial load.
+   * @param {HTMLInputElement} input
+   */
+  #selectVariant(input) {
+    const optionValueId = input.dataset.optionValueId ?? '';
 
     this.dispatchEvent(new VariantSelectedEvent({ id: optionValueId }));
-
     this.#fetchUpdatedSection(optionValueId);
 
-    const variantId = selectedInput.dataset.variantId;
+    const variantId = input.dataset.variantId;
     if (variantId && this.dataset.templateProductMatch === 'true') {
       const url = new URL(window.location.href);
       url.searchParams.set('variant', variantId);
@@ -45,11 +104,11 @@ export default class WineSelector extends Component {
         history.replaceState({}, '', url.toString());
       }
     }
-  };
+  }
 
   /**
-   * Fetches updated section HTML and morphs the component.
-   * @param {string} optionValueId - The selected option value ID.
+   * Fetches updated section HTML and dispatches VariantUpdateEvent.
+   * @param {string} optionValueId
    */
   async #fetchUpdatedSection(optionValueId) {
     this.#abortController?.abort();
@@ -69,20 +128,6 @@ export default class WineSelector extends Component {
 
       const variant = JSON.parse(textContent);
 
-      const newSource = html.querySelector('wine-selector-component');
-      if (newSource) {
-        this.dataset.productId = newSource instanceof HTMLElement ? newSource.dataset.productId : this.dataset.productId;
-        this.dataset.productUrl = newSource instanceof HTMLElement ? newSource.dataset.productUrl : this.dataset.productUrl;
-
-        morph(this, newSource, {
-          ...MORPH_OPTIONS,
-          getNodeKey: (node) => {
-            if (!(node instanceof HTMLElement)) return undefined;
-            return node.dataset.key;
-          },
-        });
-      }
-
       this.dispatchEvent(
         new VariantUpdateEvent(variant, optionValueId, {
           html,
@@ -90,9 +135,7 @@ export default class WineSelector extends Component {
         })
       );
     } catch (error) {
-      if (error.name === 'AbortError') {
-        console.warn('Fetch aborted');
-      } else {
+      if (error.name !== 'AbortError') {
         console.error(error);
       }
     }
