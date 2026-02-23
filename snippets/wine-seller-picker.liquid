@@ -91,6 +91,8 @@
           class="visually-hidden"
           data-option-value-id="{{ best_option_value_id }}"
           data-variant-id="{{ best_variant.id }}"
+          data-min-quantity="{{ best_min_qty | default: 1 }}"
+          data-lot-size="{{ best_lot_size | default: 1 }}"
           ref="bestOfferInput"
           checked
           aria-hidden="true"
@@ -195,10 +197,16 @@
                     type="button"
                     class="wine-selector__add-to-cart"
                     data-variant-id="{{ variant.id }}"
+                    data-min-quantity="{{ s_min_qty | default: 1 }}"
+                    data-lot-size="{{ s_lot_size | default: 1 }}"
                     on:click="/addToCart"
                     ref="addToCartButtons[]"
                   >
-                    Ajouter au panier
+                    {%- if s_min_qty != blank and s_min_qty > 1 -%}
+                      Ajouter {{ s_min_qty }} bouteilles
+                    {%- else -%}
+                      Ajouter au panier
+                    {%- endif -%}
                   </button>
                 {%- else -%}
                   <button type="button" class="wine-selector__add-to-cart" disabled>

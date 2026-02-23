@@ -15,6 +15,9 @@ import { VariantSelectedEvent, VariantUpdateEvent, CartAddEvent } from '@theme/e
  * block handles add-to-cart. A <details> toggle reveals other sellers, each with
  * their own add-to-cart button that posts directly to the Cart API.
  *
+ * Enforces wine-specific quantity constraints (min quantity + lot size) on both
+ * the product form's quantity selector and the direct add-to-cart buttons.
+ *
  * @extends {Component<WineSelectorRefs>}
  */
 export default class WineSelector extends Component {
@@ -24,7 +27,6 @@ export default class WineSelector extends Component {
   connectedCallback() {
     super.connectedCallback();
 
-    // Select the best-offer variant on first load so product-form picks it up
     const bestInput = this.refs.bestOfferInput;
     if (bestInput) {
       this.#selectVariant(bestInput);
@@ -33,21 +35,25 @@ export default class WineSelector extends Component {
 
   /**
    * Handles clicking "Ajouter au panier" on an alternative seller card.
-   * Posts directly to the Cart API then dispatches CartAddEvent.
+   * Posts directly to the Cart API with the correct quantity (min_quantity),
+   * then dispatches CartAddEvent.
    * @param {MouseEvent} event
    */
   addToCart(event) {
-    // event.target is proxied by the declarative event system to point to the
-    // element with on:click (the button). event.currentTarget is document.
     const button = /** @type {HTMLButtonElement} */ (event.target);
     const variantId = button.dataset.variantId;
     if (!variantId) return;
 
+    const minQuantity = Number(button.dataset.minQuantity) || 1;
+    const lotSize = Number(button.dataset.lotSize) || 1;
+    const quantity = Math.max(minQuantity, lotSize);
+
     button.disabled = true;
+    const originalText = button.textContent;
     button.textContent = '…';
 
     const body = JSON.stringify({
-      items: [{ id: Number(variantId), quantity: 1 }],
+      items: [{ id: Number(variantId), quantity }],
     });
 
     fetch(Theme.routes.cart_add_url, {
@@ -61,7 +67,7 @@ export default class WineSelector extends Component {
           button.textContent = 'Erreur';
           setTimeout(() => {
             button.disabled = false;
-            button.textContent = 'Ajouter au panier';
+            button.textContent = originalText;
           }, 2000);
           return;
         }
@@ -69,13 +75,13 @@ export default class WineSelector extends Component {
         button.textContent = 'Ajouté !';
         setTimeout(() => {
           button.disabled = false;
-          button.textContent = 'Ajouter au panier';
+          button.textContent = originalText;
         }, 1500);
 
         this.dispatchEvent(
           new CartAddEvent({}, this.id, {
             source: 'wine-selector',
-            itemCount: 1,
+            itemCount: quantity,
             productId: this.dataset.productId,
             variantId,
           })
@@ -83,13 +89,13 @@ export default class WineSelector extends Component {
       })
       .catch(() => {
         button.disabled = false;
-        button.textContent = 'Ajouter au panier';
+        button.textContent = originalText;
       });
   }
 
   /**
-   * Selects a variant by dispatching events and fetching updated section HTML.
-   * Used for the best-offer on initial load.
+   * Selects a variant and applies wine quantity constraints to the product form's
+   * quantity selector.
    * @param {HTMLInputElement} input
    */
   #selectVariant(input) {
@@ -106,6 +112,34 @@ export default class WineSelector extends Component {
         history.replaceState({}, '', url.toString());
       }
     }
+
+    // Apply wine quantity constraints to the product form's quantity selector
+    this.#applyQuantityConstraints(input);
+  }
+
+  /**
+   * Reads min_quantity / lot_size from the input's data attributes and applies
+   * them to the nearest product-form's quantity selector.
+   * @param {HTMLInputElement} input
+   */
+  #applyQuantityConstraints(input) {
+    const minQuantity = Number(input.dataset.minQuantity) || 1;
+    const lotSize = Number(input.dataset.lotSize) || 1;
+
+    if (minQuantity <= 1 && lotSize <= 1) return;
+
+    // Find the product-form-component in the same section
+    const section = this.closest('.shopify-section') ?? this.closest('product-form-component')?.parentElement;
+    /** @type {any} */
+    const productForm = section?.querySelector('product-form-component');
+    /** @type {any} */
+    const quantitySelector = productForm?.refs?.quantitySelector;
+
+    if (!quantitySelector?.updateConstraints) return;
+
+    quantitySelector.updateConstraints(String(minQuantity), null, String(lotSize));
+    quantitySelector.setValue(String(minQuantity));
+    quantitySelector.updateButtonStates();
   }
 
   /**
@@ -136,6 +170,12 @@ export default class WineSelector extends Component {
           productId: this.dataset.productId ?? '',
         })
       );
+
+      // Re-apply constraints after variant update (product-form may have reset them)
+      const bestInput = this.refs.bestOfferInput;
+      if (bestInput) {
+        this.#applyQuantityConstraints(bestInput);
+      }
     } catch (error) {
       if (error.name !== 'AbortError') {
         console.error(error);
