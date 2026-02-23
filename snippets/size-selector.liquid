@@ -8,6 +8,7 @@
 {% liquid
   assign siblings_metaobject = product_resource.metafields.custom.siblings_size.value
   assign siblings = siblings_metaobject.products.value
+  assign current_path = request.path
 %}
 
 {% if siblings != blank and siblings.size > 1 %}
@@ -22,8 +23,9 @@
           else
             assign label = sibling.title
           endif
+          assign sibling_path = sibling.url | split: '?' | first
         %}
-        {% if sibling.handle == product_resource.handle %}
+        {% if sibling_path == current_path %}
           <span class="size-selector__pill size-selector__pill--active" aria-current="page">
             {{- label -}}
           </span>
