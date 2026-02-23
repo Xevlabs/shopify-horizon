@@ -23,7 +23,7 @@
             assign label = sibling.title
           endif
         %}
-        {% if sibling.id == product_resource.id %}
+        {% if sibling.handle == product_resource.handle %}
           <span class="size-selector__pill size-selector__pill--active" aria-current="page">
             {{- label -}}
           </span>
