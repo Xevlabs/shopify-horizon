@@ -27,6 +27,19 @@
   else
     assign min_quantity = variant.quantity_rule.min | default: 1
   endif
+
+  # Wine metafield overrides: use wine.min_quantity and custom.wine_lot_size
+  # when they exist and are greater than the native quantity rules.
+  assign wine_min = variant.metafields.wine.min_quantity.value | times: 1
+  assign wine_lot = variant.metafields.custom.wine_lot_size.value | times: 1
+  assign step_quantity = variant.quantity_rule.increment | default: 1
+
+  if wine_min != blank and wine_min > 1 and wine_min > min_quantity
+    assign min_quantity = wine_min
+  endif
+  if wine_lot != blank and wine_lot > 1 and wine_lot > step_quantity
+    assign step_quantity = wine_lot
+  endif
 %}
 
 <div
@@ -61,10 +74,10 @@
     <input
       type="number"
       name="{% if line_index %}updates[]{% else %}quantity{% endif %}"
-      value="{{ in_cart_quantity | default: variant.quantity_rule.min | default: 1 }}"
+      value="{{ in_cart_quantity | default: min_quantity }}"
       data-cart-quantity="{{ cart | item_count_for_variant: variant.id }}"
       min="{{ min_quantity }}"
-      data-min="{{ variant.quantity_rule.min | default: 1 }}"
+      data-min="{{ min_quantity }}"
       on:blur="/setQuantity"
       on:focus="/selectInputValue"
       ref="quantityInput"
@@ -75,7 +88,7 @@
       {% if variant.quantity_rule.max %}
         max="{{ variant.quantity_rule.max }}"
       {% endif %}
-      step="{{ variant.quantity_rule.increment | default: 1 }}"
+      step="{{ step_quantity }}"
       {% if can_update_quantity == false or variant.available == false %}
         disabled
       {% endif %}
