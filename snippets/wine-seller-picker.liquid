@@ -1,0 +1,292 @@
+{%- doc -%}
+  Renders a wine seller variant picker. Each product variant represents a different
+  seller for the same wine. Displays stacked cards with seller info, price, and
+  availability. Best offer is shown first.
+
+  @param {object} product_resource - The product object (from closest.product)
+  @param {object} [block] - The block object
+
+  @example
+  {% render 'wine-seller-picker', product_resource: product_resource %}
+{%- enddoc -%}
+
+{% assign block_settings = block.settings %}
+
+{% unless product_resource == blank or product_resource.variants.size < 1 %}
+  <wine-selector-component
+    class="wine-selector spacing-style"
+    style="{% render 'spacing-style', settings: block_settings %}"
+    data-section-id="{{ section.id }}"
+    data-block-id="{{ block.id }}"
+    data-product-id="{{ product_resource.id }}"
+    data-product-url="{{ product_resource.url }}"
+    {% if product.id == product_resource.id %}
+      data-template-product-match="true"
+    {% endif %}
+    {{ block.shopify_attributes }}
+  >
+    {% liquid
+      assign selected_variant = product_resource.selected_or_first_available_variant
+
+      # Build arrays: best offers first, then the rest
+      assign best_variants = ''
+      assign other_variants = ''
+
+      for variant in product_resource.variants
+        assign is_best = variant.metafields.wine.is_best_offer.value
+        if is_best == true
+          if best_variants == ''
+            assign best_variants = variant.id
+          else
+            assign best_variants = best_variants | append: ',' | append: variant.id
+          endif
+        else
+          if other_variants == ''
+            assign other_variants = variant.id
+          else
+            assign other_variants = other_variants | append: ',' | append: variant.id
+          endif
+        endif
+      endfor
+
+      if best_variants != ''
+        if other_variants != ''
+          assign sorted_ids = best_variants | append: ',' | append: other_variants
+        else
+          assign sorted_ids = best_variants
+        endif
+      else
+        assign sorted_ids = other_variants
+      endif
+
+      assign sorted_id_array = sorted_ids | split: ','
+    %}
+
+    <fieldset class="wine-selector__fieldset">
+      <legend class="visually-hidden">{{ 'content.vendor' | t }}</legend>
+
+      {%- for variant_id_str in sorted_id_array -%}
+        {%- liquid
+          assign variant_id_num = variant_id_str | times: 1
+
+          assign variant = nil
+          for v in product_resource.variants
+            if v.id == variant_id_num
+              assign variant = v
+              break
+            endif
+          endfor
+
+          if variant == blank
+            continue
+          endif
+
+          assign seller_metaobject = variant.metafields.wine.seller.value
+          assign is_best_offer = variant.metafields.wine.is_best_offer.value
+          assign min_quantity = variant.metafields.wine.min_quantity.value
+          assign lot_size = variant.metafields.custom.wine_lot_size.value
+          assign is_producer = false
+          if seller_metaobject.is_producer == true
+            assign is_producer = true
+          endif
+
+          assign seller_name = variant.title
+          if seller_metaobject.name != blank
+            assign seller_name = seller_metaobject.name
+          endif
+
+          assign is_selected = false
+          if variant.id == selected_variant.id
+            assign is_selected = true
+          endif
+
+          # Get option value id from the variant's option values
+          assign option_value_id = ''
+          for option_value in variant.option_values
+            assign option_value_id = option_value.id
+          endfor
+        -%}
+
+        <label
+          class="wine-selector__card{% if is_best_offer == true %} wine-selector__card--best-offer{% endif %}{% if is_selected %} wine-selector__card--selected{% endif %}"
+          data-key="seller-card-{{ variant.id }}"
+        >
+          <input
+            type="radio"
+            name="seller-{{ block.id }}-{{ product_resource.id }}"
+            value="{{ variant.id }}"
+            class="wine-selector__radio visually-hidden"
+            data-option-value-id="{{ option_value_id }}"
+            data-variant-id="{{ variant.id }}"
+            ref="cards[]"
+            {% if is_selected %}
+              checked
+            {% endif %}
+            {% unless variant.available %}
+              disabled
+            {% endunless %}
+          >
+
+          <span class="wine-selector__card-inner">
+            <span class="wine-selector__card-header">
+              {%- if is_best_offer == true -%}
+                <span class="wine-selector__badge wine-selector__badge--best">Meilleure offre</span>
+              {%- endif -%}
+              {%- if is_producer -%}
+                <span class="wine-selector__badge wine-selector__badge--producer">Direct Producteur</span>
+              {%- endif -%}
+            </span>
+
+            <span class="wine-selector__card-body">
+              <span class="wine-selector__seller-name">{{ seller_name }}</span>
+              <span class="wine-selector__price">{{ variant.price | money }}</span>
+            </span>
+
+            <span class="wine-selector__card-details">
+              {%- if min_quantity != blank and min_quantity > 1 -%}
+                <span class="wine-selector__detail">À partir de {{ min_quantity }} bouteilles</span>
+              {%- endif -%}
+              {%- if lot_size != blank -%}
+                <span class="wine-selector__detail">Lot de {{ lot_size }}</span>
+              {%- endif -%}
+              {%- unless variant.available -%}
+                <span class="wine-selector__detail wine-selector__detail--unavailable">Indisponible</span>
+              {%- endunless -%}
+            </span>
+          </span>
+        </label>
+      {%- endfor -%}
+    </fieldset>
+
+    <script type="application/json">
+      {{ selected_variant | json }}
+    </script>
+  </wine-selector-component>
+{% endunless %}
+
+{% javascript %}
+  import '@theme/wine-selector';
+{% endjavascript %}
+
+{% stylesheet %}
+  .wine-selector {
+    display: block;
+    width: 100%;
+  }
+
+  .wine-selector__fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm, 8px);
+    border: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .wine-selector__card {
+    display: block;
+    position: relative;
+    border: var(--style-border-width-inputs, 1px) solid var(--color-border);
+    border-radius: var(--style-border-radius-inputs, 8px);
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+
+  .wine-selector__card:hover {
+    border-color: var(--color-foreground);
+  }
+
+  .wine-selector__card--selected {
+    border-color: var(--color-foreground);
+    border-width: 2px;
+  }
+
+  .wine-selector__card:has(input:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .wine-selector__card:has(input:focus-visible) {
+    outline: var(--focus-outline-width, 2px) solid currentcolor;
+    outline-offset: var(--focus-outline-offset, 2px);
+  }
+
+  .wine-selector__card-inner {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs, 4px);
+    padding: var(--spacing-md, 12px) var(--spacing-lg, 16px);
+  }
+
+  .wine-selector__card-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs, 4px);
+  }
+
+  .wine-selector__card-header:empty {
+    display: none;
+  }
+
+  .wine-selector__badge {
+    display: inline-block;
+    padding: 2px var(--spacing-xs, 4px);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .wine-selector__badge--best {
+    background-color: var(--color-foreground);
+    color: var(--color-background);
+  }
+
+  .wine-selector__badge--producer {
+    background-color: transparent;
+    color: var(--color-foreground);
+    border: 1px solid var(--color-foreground);
+  }
+
+  .wine-selector__card-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--spacing-sm, 8px);
+  }
+
+  .wine-selector__seller-name {
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .wine-selector__price {
+    font-weight: 600;
+    font-size: 1rem;
+    white-space: nowrap;
+  }
+
+  .wine-selector__card-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  }
+
+  .wine-selector__card-details:empty {
+    display: none;
+  }
+
+  .wine-selector__detail {
+    font-size: 0.85rem;
+    color: var(--color-foreground);
+    opacity: 0.7;
+  }
+
+  .wine-selector__detail--unavailable {
+    color: var(--color-foreground);
+    opacity: 1;
+    font-weight: 600;
+  }
+{% endstylesheet %}

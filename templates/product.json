@@ -173,12 +173,9 @@
               },
               "blocks": {}
             },
-            "variant_picker_R3rGDr": {
-              "type": "variant-picker",
+            "wine_selector_twill": {
+              "type": "wine-selector",
               "settings": {
-                "variant_style": "buttons",
-                "show_swatches": false,
-                "alignment": "left",
                 "padding-block-start": 0,
                 "padding-block-end": 0,
                 "padding-inline-start": 0,
@@ -251,7 +248,7 @@
           "block_order": [
             "group_icgrde",
             "divider_VJhene",
-            "variant_picker_R3rGDr",
+            "wine_selector_twill",
             "buy_buttons_eYQEYi",
             "text_aEtTtq"
           ]
