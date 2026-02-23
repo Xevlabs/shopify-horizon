@@ -37,7 +37,9 @@ export default class WineSelector extends Component {
    * @param {MouseEvent} event
    */
   addToCart(event) {
-    const button = /** @type {HTMLButtonElement} */ (event.currentTarget);
+    // event.target is proxied by the declarative event system to point to the
+    // element with on:click (the button). event.currentTarget is document.
+    const button = /** @type {HTMLButtonElement} */ (event.target);
     const variantId = button.dataset.variantId;
     if (!variantId) return;
 
